@@ -25,6 +25,31 @@ jobs:
         run: sh tools/check-cldc.sh
 
   # ---------------------------------------------------------------------------
+  # Compiles (type-checks) src/ against the compile-only API stubs in ci/stubs/
+  # using a stock JDK. Runs on hosted runners with no proprietary SDK. Catches
+  # real errors (bad signatures, missing methods, type mismatches) that the grep
+  # guardrail cannot. Does NOT produce a .cod.
+  # ---------------------------------------------------------------------------
+  compile:
+    name: Type-check (stub compile)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Compile against API stubs
+        run: sh ci/compile-check.sh
+      - name: Upload type-check classes
+        uses: actions/upload-artifact@v4
+        with:
+          name: bbtime-classes-typecheck
+          path: build/ci-classes/**/*.class
+          if-no-files-found: error
+
+  # ---------------------------------------------------------------------------
   # Produces the actual bbtime.cod with rapc.
   #
   # rapc + net_rim_api.jar are RIM proprietary tools and are NOT downloadable
@@ -44,7 +69,7 @@ jobs:
   # ---------------------------------------------------------------------------
   build:
     name: rapc build
-    needs: guardrails
+    needs: [ guardrails, compile ]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
