@@ -198,15 +198,23 @@ javaloader.exe -u load "C:\path\to\bbtime.cod"
 
 ---
 
-## 7. 关于代码签名
+## 7. 关于代码签名（真机必须）
 
-**本项目不需要 RIM 代码签名密钥。** 因为它没有调用任何"受控 API"（Controlled
-APIs）——只用了网络(`Connector`)、持久化(`PersistentStore`)、UI 和后台
-`Application`,这些在 OS 4.5 上未签名也能装能跑。
+**真机上本项目必须签名。** 因为 `ClockSetter` 用了受控 API
+`Device.setDateTime(long)`——受控 API 未签名时在真机上会抛
+`ControlledAccessException`。
 
-只有当你将来改动去用受控 API（比如真正去写系统时钟、读通讯录、拦截短信等）才需要
-向 RIM/BlackBerry 申请签名密钥(`.csi`)并用 `SignatureTool.jar` 签名。当前
-`ClockSetter` 是空实现(平台不给第三方设时钟),所以用不到。
+- **模拟器**:受控 API 不用签名,直接能跑,可以先在模拟器里验证"按 S 改时间"。
+- **真机**:cod 装上去要能改时间,必须用 RIM 签名密钥签过。流程是向
+  BlackBerry 申请签名密钥,再用 JDE 里的 `SignatureTool.jar`（或菜单
+  `Build → Request/Sign`)对 cod 签名。
+
+> ⚠️ 2026 年的现实:RIM 的签名服务器早已关停,**现在基本申请不到新的签名密钥**。
+> 如果你没有当年留下的密钥,真机上 `Device.setDateTime` 会被受控 API 拦住——这时
+> App 会回退到"显示正确时间 + 提示手动对表"。这是目前最大的实际障碍,不是代码问题。
+>
+> 其余用到的 API(网络 `Connector`、持久化 `PersistentStore`、UI、后台
+> `Application`)本身不需要签名;需要签名的只有 `Device.setDateTime` 这一处。
 
 ---
 
@@ -229,9 +237,19 @@ A：要么启动 **MDS Simulator** 再试 HTTP/HTTPS;要么在 Transport 里选
 数据,在 Transport 里选 `Wi-Fi` / `Direct TCP` / `BIS/MDS` 试。
 
 **Q：能自动改系统时间吗？**
-A：**不能**。原生 BlackBerry OS(4.5–7.x)不给第三方 App 设系统时钟,系统时间
-由运营商网络(NITZ)提供。所以 bbtime 会算出精确时间和偏差、显示出来,并在偏差
-较大时弹出提示,让你去 `选项 → 日期/时间` 手动对表。详见 README 的 "Limitation"。
+A：**能**。用的是 RIM API `net.rim.device.api.system.Device.setDateTime(long)`
+（`static boolean`,自 BlackBerry API 3.6.0 起就有,所以 4.5+ 都能用),按 `S`
+会真正写入系统时间。但真机上有两个前提(模拟器都不需要):
+
+1. **必须代码签名**。`Device.setDateTime` 是受控 API,未签名会抛
+   `ControlledAccessException`,所以真机装的 cod 必须用 RIM 签名密钥签过。
+2. **先关掉自动网络对时**。到 `选项 → 日期/时间`,把"更新时间"改成 `手动`,
+   否则系统会用运营商网络时间(NITZ)把你改的覆盖掉。企业 **IT Policy** 也可能
+   直接禁止改时间。
+
+设置失败时 bbtime 不会假装成功,会在状态栏说明,并弹出精确时间让你手动对。
+注意 `Device.setTimeZone()` 是 4.6.0 才有,针对 4.5 我们只设绝对时间(UTC),
+时区留给用户自己在系统里设。
 
 ---
 

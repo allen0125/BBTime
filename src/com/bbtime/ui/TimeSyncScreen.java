@@ -201,16 +201,17 @@ public final class TimeSyncScreen extends MainScreen implements FieldChangeListe
         sb.append("\nApply: ").append(ClockSetter.describe(outcome.applied));
         setStatus(sb.toString());
 
-        // On stock OS the clock can't be set programmatically; if it's off by a
-        // noticeable margin, prompt the user with the exact time to enter.
+        // The clock is set via Device.setDateTime (signed/controlled API). If it
+        // could not be applied, explain the usual causes and give the exact time
+        // so the user can set it by hand as a fallback.
         if (!ClockSetter.applied(outcome.applied)) {
-            long abs = offset < 0 ? -offset : offset;
-            if (abs >= 2000) {
-                Dialog.inform("Device clock is off by "
-                        + TimeFmt.describeOffset(offset)
-                        + ".\n\nSet it in Options > Date/Time to:\n"
-                        + TimeFmt.formatLocal(outcome.result.utcMillis));
-            }
+            Dialog.inform("Could not set the clock automatically.\n\n"
+                    + "Correct time:\n" + TimeFmt.formatLocal(outcome.result.utcMillis)
+                    + "\n\nOn a real device this needs:\n"
+                    + "1) a code-signed build,\n"
+                    + "2) Options > Date/Time set to Manual (automatic time off),\n"
+                    + "3) no IT policy blocking time changes.\n\n"
+                    + "Otherwise set the time above manually.");
         }
     }
 

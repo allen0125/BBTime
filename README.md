@@ -138,21 +138,25 @@ whatever you select in the UI is what the daemon uses.
 
 ---
 
-## Limitation: setting the clock
+## Setting the clock (and when it fails)
 
-**Stock BlackBerry OS (4.5–7.x) has no public API for a third-party app to set
-the system clock** — the device gets time from the carrier network (NITZ). So
-`bbtime` cannot silently overwrite the clock on an unmodified OS.
+`bbtime` sets the system clock with the RIM API
+**`net.rim.device.api.system.Device.setDateTime(long utcMillis)`** — a `static
+boolean` available since BlackBerry API 3.6.0, i.e. on **OS 4.5+**. So the one-key
+sync really does change the device time; it does not just display it.
 
-What it does instead: it computes the exact correct time and the drift, displays
-them, and — when the clock is off by more than a couple of seconds — pops up the
-precise value to enter under **Options → Date/Time**.
+Two things gate it on a **real device** (neither applies on the simulator):
 
-`ClockSetter.apply(...)` is the single, documented seam where a signed or
-privileged build with a native time-set capability can plug in an actual setter
-and have the one-key sync become fully automatic. The app never fakes success:
-the status line always reports honestly whether the clock was changed or must be
-set manually.
+1. **Code signing.** `Device.setDateTime` is a *controlled* API. Unsigned, it
+   throws `ControlledAccessException`; the build must be signed with RIM keys.
+2. **Automatic network time.** If **Options → Date/Time** has time set to update
+   automatically, the OS overrides your change — switch it to **Manual** first.
+   An enterprise **IT policy** can also block time changes.
+
+When the set fails for any of these, the app doesn't fake success: it reports it
+on the status line and pops up the exact correct time so you can set it by hand.
+`Device.setTimeZone(...)` is only 4.6.0+, so on a 4.5 target the **time zone** is
+left to the user; `bbtime` sets the absolute instant (UTC), which is what matters.
 
 ---
 

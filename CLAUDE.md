@@ -31,14 +31,27 @@ introduced:
 Use `Vector`/`Hashtable` (raw), `StringBuffer`, explicit `new Long(...)`, and
 indexed loops. Network I/O must run off the UI event thread.
 
-### The clock-setting limitation
+### Setting the clock
 
-Stock BlackBerry OS (4.5–7.x) exposes **no public API for a third-party app to
-set the system clock** — the platform sources time from the carrier (NITZ). So
-`ClockSetter.apply(...)` returns `UNSUPPORTED` by design, and the UI falls back
-to displaying the exact correct time and the measured offset so the user can
-adjust it manually. `ClockSetter` is the single integration seam where a
-signed/privileged build could implement a native setter. Do not fake success.
+The device clock is set with the RIM API
+`net.rim.device.api.system.Device.setDateTime(long utcMillis)` (a `static
+boolean`, available since BlackBerry API 3.6.0 → OS 4.5+). `ClockSetter.apply(...)`
+calls it and maps the result to `OK`/`FAILED`. The argument is **UTC ms since the
+Unix epoch** — the raw value from NTP/HTTP; never apply a timezone offset (the
+zone only affects display).
+
+Caveats to keep in mind when editing:
+
+- `Device.setDateTime` is a **controlled API**: it runs unsigned on the
+  simulator, but a **real device needs a code-signed build** or it throws
+  `ControlledAccessException` (caught → `FAILED`).
+- It also returns `false`/fails if the device updates time automatically from the
+  network, if an IT policy forbids it, or if the target is before 2002-01-01.
+- `Device.setTimeZone(TimeZone)` is **4.6.0+**, so do NOT rely on it for a 4.5
+  target — leave the time zone to the user.
+
+Report the outcome honestly (the UI shows whether the clock was set or must be
+set by hand); do not fake success.
 
 ## Architecture
 
