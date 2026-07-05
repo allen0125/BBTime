@@ -1,21 +1,20 @@
 name: build
 
+# Cloud CI verifies the source only — it does NOT produce a .cod. rapc and
+# net_rim_api.jar are RIM proprietary tools (Windows binaries incl. preverify)
+# that cannot run on hosted Linux runners, so the .cod is built locally with the
+# BlackBerry JDE on Windows (see README "Build"). These jobs guarantee the
+# source stays CLDC-compatible and type-checks before you build.
+
 on:
   push:
     branches: [ main ]
-    tags: [ 'v*' ]
   pull_request:
     branches: [ main ]
   workflow_dispatch:
 
-permissions:
-  contents: write  # needed to attach artifacts to a Release on tag builds
-
 jobs:
-  # ---------------------------------------------------------------------------
-  # Always runs on stock GitHub-hosted runners (no proprietary SDK needed).
   # Enforces the CLDC 1.1 / MIDP 2.0 source constraints from CLAUDE.md.
-  # ---------------------------------------------------------------------------
   guardrails:
     name: CLDC guardrails
     runs-on: ubuntu-latest
@@ -24,12 +23,9 @@ jobs:
       - name: Enforce CLDC/MIDP source constraints
         run: sh tools/check-cldc.sh
 
-  # ---------------------------------------------------------------------------
   # Compiles (type-checks) src/ against the compile-only API stubs in ci/stubs/
-  # using a stock JDK. Runs on hosted runners with no proprietary SDK. Catches
-  # real errors (bad signatures, missing methods, type mismatches) that the grep
-  # guardrail cannot. Does NOT produce a .cod.
-  # ---------------------------------------------------------------------------
+  # using a stock JDK. Catches bad signatures, missing methods, and type
+  # mismatches that the grep guardrail cannot. Does NOT produce a .cod.
   compile:
     name: Type-check (stub compile)
     runs-on: ubuntu-latest
@@ -48,117 +44,3 @@ jobs:
           name: bbtime-classes-typecheck
           path: build/ci-classes/**/*.class
           if-no-files-found: error
-
-  # ---------------------------------------------------------------------------
-  # Produces the actual bbtime.cod with rapc.
-  #
-  # rapc + net_rim_api.jar are RIM proprietary tools and are NOT downloadable
-  # from a package manager. To enable this job, set the repository secret
-  # BB_SDK_URL to a .tar.gz or .zip that extracts to a directory tree containing
-  #   bin/rapc.jar        (or bin/rapc)
-  #   lib/net_rim_api.jar
-  # (i.e. a BlackBerry JDE / Component Pack >= 4.5).
-  #
-  # Without the secret the job succeeds and simply reports that it was skipped,
-  # so the workflow stays green on a fresh fork.
-  #
-  # NOTE: the Linux rapc path can be finicky (rapc shells out to javac and a
-  # preverify step). If your Component Pack's preverify is Windows-only, run
-  # this job on a self-hosted runner with the JDE installed instead — set
-  # `runs-on` to your runner label and point BB_JDE at the local install.
-  # ---------------------------------------------------------------------------
-  build:
-    name: rapc build
-    needs: [ guardrails, compile ]
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Detect SDK secret
-        id: sdk
-        env:
-          BB_SDK_URL: ${{ secrets.BB_SDK_URL }}
-        run: |
-          if [ -n "$BB_SDK_URL" ]; then
-            echo "available=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "available=false" >> "$GITHUB_OUTPUT"
-            echo "::notice title=BlackBerry SDK not configured::Set the BB_SDK_URL secret (tarball/zip with bin/rapc.jar and lib/net_rim_api.jar) to compile a .cod. Skipping the rapc build."
-          fi
-
-      - name: Set up JDK
-        if: steps.sdk.outputs.available == 'true'
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: '8'
-
-      - name: Cache BlackBerry SDK
-        if: steps.sdk.outputs.available == 'true'
-        id: sdkcache
-        uses: actions/cache@v4
-        with:
-          path: .bb-sdk
-          key: bb-sdk-${{ hashFiles('.github/bb-sdk.version') }}
-
-      - name: Download BlackBerry SDK
-        if: steps.sdk.outputs.available == 'true' && steps.sdkcache.outputs.cache-hit != 'true'
-        env:
-          BB_SDK_URL: ${{ secrets.BB_SDK_URL }}
-        run: |
-          set -e
-          rm -rf .bb-sdk && mkdir -p .bb-sdk
-          echo "Downloading BlackBerry SDK ..."
-          curl -fsSL "$BB_SDK_URL" -o sdk-archive
-          if tar tzf sdk-archive >/dev/null 2>&1; then
-            tar xzf sdk-archive -C .bb-sdk
-          elif tar tf sdk-archive >/dev/null 2>&1; then
-            tar xf sdk-archive -C .bb-sdk
-          else
-            unzip -q sdk-archive -d .bb-sdk
-          fi
-
-      - name: Build .cod
-        if: steps.sdk.outputs.available == 'true'
-        run: |
-          set -e
-          RAPC_JAR=$(find "$PWD/.bb-sdk" -type f -name 'rapc.jar' | head -n1)
-          if [ -z "$RAPC_JAR" ]; then
-            RAPC_JAR=$(find "$PWD/.bb-sdk" -type f -name 'rapc' | head -n1)
-          fi
-          API_JAR=$(find "$PWD/.bb-sdk" -type f -name 'net_rim_api.jar' | head -n1)
-          if [ -z "$RAPC_JAR" ] || [ -z "$API_JAR" ]; then
-            echo "::error::SDK archive is missing rapc(.jar) and/or net_rim_api.jar" >&2
-            echo "Top of extracted tree:" >&2
-            find "$PWD/.bb-sdk" -maxdepth 3 | head -n 60 >&2
-            exit 1
-          fi
-          BB_JDE="$(dirname "$(dirname "$RAPC_JAR")")"
-          echo "BB_JDE=$BB_JDE"
-          chmod +x build.sh
-          BB_JDE="$BB_JDE" BB_API="$API_JAR" ./build.sh
-
-      - name: Upload .cod artifact
-        if: steps.sdk.outputs.available == 'true'
-        uses: actions/upload-artifact@v4
-        with:
-          name: bbtime-cod
-          path: |
-            build/bbtime.cod
-            build/bbtime.jar
-            bbtime.alx
-          if-no-files-found: error
-
-      - name: Attach to Release (tag builds)
-        if: steps.sdk.outputs.available == 'true' && startsWith(github.ref, 'refs/tags/')
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set -e
-          FILES="build/bbtime.cod bbtime.alx"
-          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
-            gh release upload "$GITHUB_REF_NAME" $FILES --clobber
-          else
-            gh release create "$GITHUB_REF_NAME" $FILES \
-              --title "bbtime $GITHUB_REF_NAME" --generate-notes
-          fi

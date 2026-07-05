@@ -31,10 +31,6 @@ replay_pid*
 *.jdw.bak
 *.jdp.bak
 
-# CI: downloaded BlackBerry SDK + archive
-.bb-sdk/
-sdk-archive
-
 # OS noise
 .DS_Store
 Thumbs.db
