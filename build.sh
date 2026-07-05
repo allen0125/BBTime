@@ -32,12 +32,14 @@ OUT="build"
 #   - rapc already on PATH
 if [ -x "$BB_JDE/bin/rapc" ]; then
   RAPC="$BB_JDE/bin/rapc"
+elif [ -f "$BB_JDE/bin/rapc.exe" ]; then
+  RAPC="$BB_JDE/bin/rapc.exe"
 elif [ -f "$BB_JDE/bin/rapc.jar" ]; then
   RAPC="java -jar $BB_JDE/bin/rapc.jar"
 elif command -v rapc >/dev/null 2>&1; then
   RAPC="rapc"
 else
-  echo "rapc not found (looked for $BB_JDE/bin/rapc, $BB_JDE/bin/rapc.jar, and PATH)" >&2
+  echo "rapc not found (looked for $BB_JDE/bin/rapc, rapc.exe, rapc.jar, and PATH)" >&2
   exit 1
 fi
 

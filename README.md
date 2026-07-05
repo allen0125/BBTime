@@ -44,6 +44,12 @@ BB_JDE=/path/to/BlackBerry/JDE ./build.sh
 `build.sh` compiles every `.java` under `src/` against `net_rim_api.jar` using
 the module descriptor `bbtime.rapc`.
 
+> **Windows + JDE step-by-step (中文):** see
+> [`docs/BUILD-Windows-JDE.zh-CN.md`](docs/BUILD-Windows-JDE.zh-CN.md) — which
+> JDE/JDK to use (JDE 4.5 needs **32-bit JDK 1.5**, *not* 1.7+), install order,
+> building in the JDE IDE, wiring the autostart alternate entry point, simulator
+> testing, and installing to a device. **Do not** feed `ci/stubs/` to `rapc`.
+
 > **Note on the source language:** this is CLDC 1.1 / MIDP 2.0 (Java 1.3-level).
 > No generics, autoboxing, reflection, `String.split`, or `SimpleDateFormat`.
 > See [`CLAUDE.md`](CLAUDE.md) before editing.
