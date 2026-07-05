@@ -137,7 +137,7 @@ public final class TimeSyncScreen extends MainScreen implements FieldChangeListe
     }
 
     public void fieldChanged(Field field, int context) {
-        if (context == PROGRAMMATIC) {
+        if (context == Field.PROGRAMMATIC) {
             return;
         }
         if (field == protocolChoice) {
