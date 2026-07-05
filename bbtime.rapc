@@ -1,0 +1,10 @@
+# Application descriptor consumed by rapc.
+# rapc locates the entry point automatically via the class that declares
+# `public static void main(String[])` (com.bbtime.TimeSyncApp).
+MIDlet-Name: bbtime
+MIDlet-Version: 1.0.0
+MIDlet-Vendor: bbtime
+MIDlet-Description: Network time synchronisation over NTP/HTTP/HTTPS/UDP
+MIDlet-Jar-URL: bbtime.jar
+RIM-COD-Module-Name: bbtime
+RIM-COD-Module-Dependencies: net_rim_cldc
