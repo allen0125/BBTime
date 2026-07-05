@@ -50,6 +50,32 @@ the module descriptor `bbtime.rapc`.
 
 ---
 
+## Continuous integration
+
+`.github/workflows/build.yml` runs on every push/PR and has two jobs:
+
+1. **CLDC guardrails** *(always runs, no SDK needed)* — `tools/check-cldc.sh`
+   fails the build if any BlackBerry-incompatible construct (generics,
+   `StringBuilder`, `String.split`, `SimpleDateFormat`, reflection, for-each,
+   `enum`, annotations…) creeps into `src/`. Run it locally with
+   `sh tools/check-cldc.sh`.
+
+2. **rapc build** *(produces `bbtime.cod`)* — because `rapc` and
+   `net_rim_api.jar` are RIM proprietary tools that no package manager ships,
+   this job is **opt-in**: set the repository secret **`BB_SDK_URL`** to a
+   `.tar.gz`/`.zip` that extracts to a tree containing `bin/rapc.jar` (or
+   `bin/rapc`) and `lib/net_rim_api.jar` (a JDE / Component Pack ≥ 4.5). The
+   workflow caches the download, runs `build.sh`, uploads `bbtime.cod` as a
+   build artifact, and attaches it to a GitHub Release on `v*` tags. Without the
+   secret the job is a no-op and the workflow stays green.
+
+   The Linux `rapc` path can be finicky (it shells out to `javac` and a
+   preverify step). If your Component Pack's preverify is Windows-only, point
+   the `build` job's `runs-on` at a **self-hosted runner** that has the JDE
+   installed and set `BB_JDE` to the local install instead.
+
+---
+
 ## Install
 
 **Via BlackBerry Desktop Manager (device):** point Application Loader at
